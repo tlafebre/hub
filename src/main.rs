@@ -73,7 +73,7 @@ fn get_repo_list() -> String {
 
 fn main() {
     let repo_list = get_repo_list();
-    let repo_dir = mkdir_p("repos").unwrap();
+    let repo_dir = mkdir_p("/home/tjeerd/repos").unwrap();
 
     let v: Vec<Value> = serde_json::from_str(&repo_list).unwrap();
 
