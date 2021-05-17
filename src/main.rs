@@ -11,7 +11,7 @@ type HttpResult<T> = Result<T, reqwest::Error>;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct GitRepo {
-    clone_url: String,
+    ssh_url: String,
 }
 
 impl FromStr for GitRepo {
@@ -19,7 +19,7 @@ impl FromStr for GitRepo {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(GitRepo {
-            clone_url: String::from(s),
+            ssh_url: String::from(s),
         })
     }
 }
@@ -28,7 +28,7 @@ impl GitRepo {
     fn git_clone(self) {
         Command::new("git")
             .arg("clone")
-            .arg(self.clone_url)
+            .arg(self.ssh_url)
             .status()
             .expect("failed to clone");
     }
@@ -79,7 +79,7 @@ fn main() {
 
     if std::env::set_current_dir(repo_dir).is_ok() {
         for o in v.into_iter() {
-            let r = GitRepo::from_str(o["clone_url"].as_str().unwrap());
+            let r = GitRepo::from_str(o["ssh_url"].as_str().unwrap());
             if &o["language"] == "Rust" {
                 r.unwrap().git_clone()
             }
