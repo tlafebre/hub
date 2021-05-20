@@ -1,4 +1,7 @@
 //arg parse
+//cope with connection issues (connected to proxy)
+//cope with github token not being present. ask at initial startup
+//cope with already present repo's. should not be cloned again
 
 use reqwest::{blocking, header::USER_AGENT};
 use serde::{Deserialize, Serialize};
