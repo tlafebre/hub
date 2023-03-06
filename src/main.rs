@@ -1,30 +1,67 @@
 // arg parse list | clone
 // flags: directory
+// envvar: LANG
 // cope with connection issues (connected to proxy)
 // cope with github token not being present. ask at initial startup
 // cope with already present repo's. should not be cloned again
 
+use std::error::Error;
+use std::fmt;
+use std::fs;
+use std::process::Command;
+
 use reqwest::{blocking, header::USER_AGENT};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::fs;
-use std::process::Command;
-use std::str::FromStr;
 
 type HttpResult<T> = Result<T, reqwest::Error>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct GitRepo {
+    name: String,
     ssh_url: String,
+    lang: String,
 }
 
-impl FromStr for GitRepo {
-    type Err = std::io::Error;
+impl From<Value> for GitRepo {
+    fn from(v: Value) -> Self {
+        let name = v["full_name"].to_string().replace('"', "");
+        let ssh_url = v["ssh_url"].to_string();
+        let lang = v["language"].to_string().replace('"', "");
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(GitRepo {
-            ssh_url: String::from(s),
-        })
+        Self {
+            name,
+            ssh_url,
+            lang,
+        }
+    }
+}
+
+impl fmt::Display for GitRepo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let repo = format!(
+            "- {:<30} {}",
+            self.name.split('/').nth(1).unwrap_or(""),
+            self.lang
+        );
+        write!(f, "{}", repo)
+    }
+}
+
+#[derive(Debug)]
+struct GitRepos {
+    repos: Vec<GitRepo>,
+}
+
+impl fmt::Display for GitRepos {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let longest = self.repos.iter().map(|r| r.name.len()).max().unwrap_or(0);
+        let mut text = format!("Repo Name{}Language:\n", " ".repeat(longest - 12));
+        for r in self.repos.iter() {
+            text.push_str(&format!("{:>width$}\n", r, width = longest));
+        }
+
+        write!(f, "{}", text)
     }
 }
 
@@ -63,32 +100,22 @@ fn mkdir_p(path: &str) -> Result<&str, std::io::Error> {
     Ok(path)
 }
 
-fn get_repo_list() -> String {
+fn get_repo_list() -> Result<GitRepos, Box<dyn Error>> {
     let token = get_api_token().expect("failed to get api token"); //handle absense
     let url = format!(
         "https://api.github.com/users/tlafebre/repos?access_token={}",
         token
     );
 
-    let res = http_get(url);
+    let res = http_get(url)?.text()?;
+    let v: Vec<Value> = serde_json::from_str(&res)?;
+    let repos: Vec<GitRepo> = v.into_iter().map(|o| GitRepo::from(o)).collect();
 
-    res.unwrap().text().unwrap()
+    Ok(GitRepos { repos })
 }
 
 fn main() {
     let repo_list = get_repo_list();
-    let repo_dir = mkdir_p("/home/tjeerd/repos").unwrap();
 
-    let v: Vec<Value> = serde_json::from_str(&repo_list).unwrap();
-
-    if std::env::set_current_dir(repo_dir).is_ok() {
-        for o in v.into_iter() {
-            let r = GitRepo::from_str(o["ssh_url"].as_str().unwrap());
-            if &o["language"] == "Rust" {
-                r.unwrap().git_clone()
-            }
-        }
-    } else {
-        eprint!("Something went wrong");
-    }
+    println!("{}", repo_list.unwrap());
 }
