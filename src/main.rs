@@ -1,7 +1,8 @@
-//arg parse
-//cope with connection issues (connected to proxy)
-//cope with github token not being present. ask at initial startup
-//cope with already present repo's. should not be cloned again
+// arg parse list | clone
+// flags: directory
+// cope with connection issues (connected to proxy)
+// cope with github token not being present. ask at initial startup
+// cope with already present repo's. should not be cloned again
 
 use reqwest::{blocking, header::USER_AGENT};
 use serde::{Deserialize, Serialize};
@@ -40,7 +41,7 @@ impl GitRepo {
 fn get_api_token() -> Result<String, String> {
     let path = String::from("/home/tjeerd/.git_api_token");
     if let Ok(token) = fs::read_to_string(path) {
-        Ok(token)
+        Ok(token.trim().to_string())
     } else {
         Err(String::from("failed to read token"))
     }
@@ -52,7 +53,7 @@ fn http_get(url: String) -> HttpResult<blocking::Response> {
     client
         .get(url)
         .header(USER_AGENT, "my rust program")
-        .header("Authorization", token)
+        .bearer_auth(token)
         .send()
 }
 
